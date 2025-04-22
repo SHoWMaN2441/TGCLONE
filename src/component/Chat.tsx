@@ -1,3 +1,4 @@
+// Chat.tsx
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, database } from "../firebase.config";
 import { onValue, push, ref, set } from "firebase/database";
@@ -102,6 +103,7 @@ export default function Chat() {
       isRead: false,
     };
     set(newRef, newMessage);
+
     const lastMsg1 = ref(
       database,
       `lastMessages/${user.uid}/${selectedUser.uid}`
@@ -158,6 +160,7 @@ export default function Chat() {
         )}
       </div>
 
+      {/* Chat */}
       <div className="flex-1 flex flex-col">
         <div className="flex-1 p-4 overflow-y-auto">
           {messages.map((msg) => (
