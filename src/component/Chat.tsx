@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, database } from "../firebase.config";
-import { onValue, push, ref, remove, set } from "firebase/database";
+import { onValue, push, ref, set } from "firebase/database";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MdDelete } from "react-icons/md";
 
@@ -16,42 +16,70 @@ type Message = {
   id: string;
   userId: string;
   message: string;
-  date: Date;
+  date: string;
+  isRead: boolean;
 };
 
 export default function Chat() {
   const [user, setUser] = useState<User>();
   const [users, setUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeUser, setActiveUser] = useState<User | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<{ [key: string]: boolean }>(
+    {}
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchUsers();
-    fetchCurrentUser();
-  }, []);
-
-  useEffect(() => {
-    if (user && activeUser) {
-      fetchPrivateMessages(activeUser.uid);
-    }
-  }, [user, activeUser]);
-
-  const getRoomId = (uid1: string, uid2: string) => {
-    return [uid1, uid2].sort().join("_");
-  };
-
-  const fetchCurrentUser = () => {
     onAuthStateChanged(auth, (u) => {
       if (u) {
-        setUser(u as User);
-        saveUser(u as User);
+        const currentUser = u as User;
+        setUser(currentUser);
+        saveUser(currentUser);
+
+        // Onlayn holatni yangilash
+        const userStatusRef = ref(database, `presence/${u.uid}`);
+        set(userStatusRef, true);
+        window.addEventListener("beforeunload", () =>
+          set(userStatusRef, false)
+        );
       } else {
         navigate("/chatregister");
       }
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    const userRef = ref(database, "users");
+    onValue(userRef, (snapshot) => {
+      const fetched: User[] = [];
+      snapshot.forEach((item) => {
+        fetched.push({ uid: item.key!, ...item.val() });
+      });
+      setUsers(fetched);
+    });
+
+    const presenceRef = ref(database, "presence");
+    onValue(presenceRef, (snapshot) => {
+      setOnlineUsers(snapshot.val() || {});
+    });
+  }, []);
+
+  useEffect(() => {
+    if (user && selectedUser) {
+      const chatId = createChatId(user.uid, selectedUser.uid);
+      const msgRef = ref(database, `messages/${chatId}`);
+      onValue(msgRef, (snapshot) => {
+        const msgs: Message[] = [];
+        snapshot.forEach((snap) => {
+          const data = snap.val();
+          msgs.push({ ...data });
+        });
+        setMessages(msgs);
+      });
+    }
+  }, [user, selectedUser]);
 
   const saveUser = (user: User) => {
     const userRef = ref(database, `users/${user.uid}`);
@@ -62,168 +90,117 @@ export default function Chat() {
     });
   };
 
-  const fetchUsers = () => {
-    const userRef = ref(database, "users");
-    onValue(userRef, (snapshot) => {
-      const allUsers: User[] = [];
-      snapshot.forEach((snap) => {
-        allUsers.push({ uid: snap.key!, ...snap.val() });
-      });
-      setUsers(allUsers);
-    });
-  };
-
-  const fetchPrivateMessages = (receiverId: string) => {
-    const roomId = getRoomId(user!.uid, receiverId);
-    const messagesRef = ref(database, `privateMessages/${roomId}`);
-    onValue(messagesRef, (snapshot) => {
-      const msgs: Message[] = [];
-      snapshot.forEach((snap) => {
-        const data = snap.val();
-        msgs.push({
-          id: snap.key!,
-          message: data.message,
-          userId: data.senderId,
-          date: new Date(data.date),
-        });
-      });
-      setMessages(msgs);
-    });
-  };
-
-  const sendPrivateMessage = () => {
-    if (!message || !activeUser) return;
-    const roomId = getRoomId(user!.uid, activeUser.uid);
-    const reference = push(ref(database, `privateMessages/${roomId}`));
-    set(reference, {
+  const handleSend = () => {
+    if (!message.trim() || !user || !selectedUser) return;
+    const chatId = createChatId(user.uid, selectedUser.uid);
+    const newRef = push(ref(database, `messages/${chatId}`));
+    const newMessage = {
+      id: newRef.key!,
+      userId: user.uid,
       message,
-      senderId: user!.uid,
-      receiverId: activeUser.uid,
       date: new Date().toISOString(),
-    });
+      isRead: false,
+    };
+    set(newRef, newMessage);
+    const lastMsg1 = ref(
+      database,
+      `lastMessages/${user.uid}/${selectedUser.uid}`
+    );
+    const lastMsg2 = ref(
+      database,
+      `lastMessages/${selectedUser.uid}/${user.uid}`
+    );
+    set(lastMsg1, newMessage);
+    set(lastMsg2, newMessage);
+
     setMessage("");
   };
 
-  const deletePrivateMessage = (messageId: string) => {
-    if (!user || !activeUser) return;
-    const roomId = getRoomId(user.uid, activeUser.uid);
-    const msgRef = ref(database, `privateMessages/${roomId}/${messageId}`);
-    remove(msgRef);
+  const createChatId = (uid1: string, uid2: string) => {
+    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Users sidebar */}
-      <div className="w-1/4 bg-white border-r border-gray-300">
-        <header className="p-4 border-b border-gray-300 flex justify-between items-center bg-indigo-600 text-white">
-          <h1 className="text-2xl font-semibold">Chat Web</h1>
+    <div className="flex h-screen">
+      {/* Sidebar */}
+      <div className="w-1/4 bg-white border-r border-gray-200 overflow-y-auto">
+        <header className="bg-indigo-600 text-white p-4 font-bold text-lg">
+          Chat Web
         </header>
-        <div className="overflow-y-auto h-screen p-3 mb-9 pb-20">
-          {users
-            .filter((u) => u.uid !== user?.uid)
-            .map((item) => (
+        {users.map(
+          (u) =>
+            u.uid !== user?.uid && (
               <div
-                key={item.uid}
-                className={`flex items-center mb-4 cursor-pointer hover:bg-gray-100 p-2 rounded-md ${
-                  activeUser?.uid === item.uid ? "bg-gray-200" : ""
+                key={u.uid}
+                onClick={() => setSelectedUser(u)}
+                className={`flex items-center gap-2 p-3 cursor-pointer ${
+                  selectedUser?.uid === u.uid
+                    ? "bg-gray-200"
+                    : "hover:bg-gray-100"
                 }`}
-                onClick={() => setActiveUser(item)}
               >
-                <img
-                  src={item.photoURL}
-                  alt=""
-                  className="w-12 h-12 rounded-full mr-3"
-                />
+                <div className="relative">
+                  <img
+                    src={u.photoURL}
+                    alt=""
+                    className="w-10 h-10 rounded-full"
+                  />
+                  {onlineUsers[u.uid] && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-white border"></span>
+                  )}
+                </div>
                 <div>
-                  <h2 className="text-lg font-semibold">{item.displayName}</h2>
-                  <p className="text-gray-600">{item.email}</p>
+                  <p className="font-medium">{u.displayName}</p>
+                  <p className="text-sm text-gray-500">{u.email}</p>
                 </div>
               </div>
-            ))}
-        </div>
+            )
+        )}
       </div>
 
-      {/* Messages area */}
-      <div className="flex-1 relative">
-        <header className="bg-white p-4 border-b text-gray-700">
-          <h1 className="text-xl font-semibold">
-            {activeUser ? activeUser.displayName : "User tanlang"}
-          </h1>
-        </header>
-
-        <div className="h-[590px] overflow-y-auto p-4 pb-36">
-          {messages.map((msg) => {
-            const messageUser = msg.userId === user?.uid ? user : activeUser;
-            return (
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 p-4 overflow-y-auto">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`mb-4 flex ${
+                msg.userId === user?.uid ? "justify-end" : "justify-start"
+              }`}
+            >
               <div
-                key={msg.id}
-                className={`flex mb-4 ${
-                  msg.userId === user?.uid ? "justify-end" : "justify-start"
+                className={`max-w-md p-3 rounded-xl text-white relative ${
+                  msg.userId === user?.uid
+                    ? "bg-indigo-500 rounded-br-none"
+                    : "bg-green-500 rounded-bl-none"
                 }`}
               >
-                {msg.userId !== user?.uid && (
-                  <img
-                    src={messageUser?.photoURL}
-                    className="w-8 h-8 rounded-full mr-2 self-end"
-                  />
-                )}
-                <div
-                  className={`max-w-96 group relative px-4 py-3 rounded-xl text-white ${
-                    msg.userId === user?.uid
-                      ? "bg-indigo-500 rounded-br-none"
-                      : "bg-green-500 rounded-bl-none"
-                  }`}
-                >
-                  <div className="flex justify-between">
-                    <p className="text-sm opacity-80">
-                      {messageUser?.displayName}
-                    </p>
-                    {msg.userId === user?.uid && (
-                      <p
-                        onClick={() => deletePrivateMessage(msg.id)}
-                        className="text-lg hidden group-hover:block absolute top-1 right-2 cursor-pointer"
-                      >
-                        <MdDelete />
-                      </p>
-                    )}
-                  </div>
-                  <p className="font-bold">{msg.message}</p>
-                  <p className="absolute -bottom-4 right-2 text-xs opacity-70">
-                    {msg.date.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                {msg.userId === user?.uid && (
-                  <img
-                    src={messageUser?.photoURL}
-                    className="w-8 h-8 rounded-full ml-2 self-end"
-                  />
-                )}
+                <p className="text-sm font-semibold">{msg.message}</p>
+                <span className="absolute text-xs right-2 bottom-[-16px] text-gray-200">
+                  {new Date(msg.date).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
-        {/* Message input */}
-        <footer className="bg-white border-t p-4 absolute bottom-0 w-3/4">
-          <div className="flex items-center">
-            <input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              type="text"
-              placeholder="Xabar yozing..."
-              className="w-full p-2 border rounded-md focus:outline-none"
-            />
-            <button
-              onClick={sendPrivateMessage}
-              className="bg-indigo-500 text-white px-4 py-2 rounded-md ml-2"
-            >
-              Yuborish
-            </button>
-          </div>
-        </footer>
+        <div className="p-4 border-t flex items-center">
+          <input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="flex-1 border rounded-md px-3 py-2"
+            type="text"
+            placeholder="Xabar yozing..."
+          />
+          <button
+            onClick={handleSend}
+            className="ml-2 bg-indigo-600 text-white px-4 py-2 rounded-md"
+          >
+            Yuborish
+          </button>
+        </div>
       </div>
     </div>
   );
