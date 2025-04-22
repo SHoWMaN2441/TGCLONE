@@ -38,8 +38,6 @@ export default function Chat() {
         const currentUser = u as User;
         setUser(currentUser);
         saveUser(currentUser);
-
-        // Onlayn holatni yangilash
         const userStatusRef = ref(database, `presence/${u.uid}`);
         set(userStatusRef, true);
         window.addEventListener("beforeunload", () =>
