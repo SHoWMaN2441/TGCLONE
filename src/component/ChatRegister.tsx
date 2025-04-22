@@ -1,32 +1,44 @@
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { useEffect } from "react";
+import { auth } from "../firebase.config";
 import { useNavigate } from "react-router-dom";
-
-import { FcGoogle } from "react-icons/fc";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function ChatRegister() {
   const navigate = useNavigate();
-  const provider = new GoogleAuthProvider();
-  const handleGoogle = () => {
-    const auth = getAuth();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate("/chat");
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
+
+  const handleLogin = () => {
+    const provider = new GoogleAuthProvider();
     signInWithPopup(auth, provider)
-      .then((result) => {
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        console.log(credential);
+      .then((res) => {
         navigate("/chat");
       })
-      .catch((error) => {
-        console.log(error);
+      .catch((err) => {
+        console.error("Login error: ", err.message);
+        alert("Kirishda xatolik yuz berdi.");
       });
   };
+
   return (
-    <div className="w-full min-h-screen flex items-center justify-center">
-      <div
-        onClick={handleGoogle}
-        className="bg-green-400 text-white cursor-pointer w-[300px] rounded-md flex items-center justify-evenly p-2 "
-      >
-        <FcGoogle className="size-8" />
-        Google orqali ro'yxatdan o'ting
+    <div className="h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-10 rounded-lg shadow-lg text-center">
+        <h1 className="text-3xl font-bold mb-6">Chatga Xush kelibsiz 👋</h1>
+        <p className="mb-4 text-gray-600">Google orqali hisobga kiring</p>
+        <button
+          onClick={handleLogin}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md"
+        >
+          Google bilan kirish
+        </button>
       </div>
     </div>
   );
