@@ -175,7 +175,7 @@ export default function Chat() {
                     : "bg-green-500 rounded-bl-none"
                 }`}
               >
-                <p className="text-sm font-semibold">{msg.message}</p>
+                <p className="text-sm font-semibold mb-0">{msg.message}</p>
                 <span className="absolute text-xs right-2 bottom-[-16px] text-gray-900">
                   {new Date(msg.date).toLocaleTimeString([], {
                     hour: "2-digit",
