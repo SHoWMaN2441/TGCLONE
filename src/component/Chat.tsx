@@ -4,7 +4,6 @@ import { auth, database } from "../firebase.config";
 import { onValue, push, ref, set } from "firebase/database";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MdDelete } from "react-icons/md";
 
 type User = {
   uid: string;
@@ -27,9 +26,6 @@ export default function Chat() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [onlineUsers, setOnlineUsers] = useState<{ [key: string]: boolean }>(
-    {}
-  );
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,13 +34,6 @@ export default function Chat() {
         const currentUser = u as User;
         setUser(currentUser);
         saveUser(currentUser);
-
-        // Onlayn holatni yangilash
-        const userStatusRef = ref(database, `presence/${u.uid}`);
-        set(userStatusRef, true);
-        window.addEventListener("beforeunload", () =>
-          set(userStatusRef, false)
-        );
       } else {
         navigate("/chatregister");
       }
@@ -59,11 +48,6 @@ export default function Chat() {
         fetched.push({ uid: item.key!, ...item.val() });
       });
       setUsers(fetched);
-    });
-
-    const presenceRef = ref(database, "presence");
-    onValue(presenceRef, (snapshot) => {
-      setOnlineUsers(snapshot.val() || {});
     });
   }, []);
 
@@ -125,44 +109,56 @@ export default function Chat() {
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
-      <div className="w-1/4 bg-white border-r border-gray-200 overflow-y-auto">
-        <header className="bg-indigo-600 text-white p-4 font-bold text-lg">
-          Chat Web
+      <div className="w-1/4 bg-white border-r border-gray-200 overflow-y-auto scrollbar-hide">
+        {/* Profile Header */}
+        <header className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 flex items-center gap-4 shadow-md">
+          <img
+            src={user?.photoURL || "https://via.placeholder.com/150"}
+            alt="User"
+            className="w-12 h-12 rounded-full border-2 border-white shadow-sm"
+          />
+          <div className="flex flex-col">
+            <span className="text-white font-semibold text-lg">
+              {user?.displayName || "Foydalanuvchi"}
+            </span>
+            <span className="text-gray-300 text-sm">
+              {user?.email || "email@example.com"}
+            </span>
+          </div>
         </header>
-        {users.map(
-          (u) =>
-            u.uid !== user?.uid && (
-              <div
-                key={u.uid}
-                onClick={() => setSelectedUser(u)}
-                className={`flex items-center gap-2 p-3 cursor-pointer ${
-                  selectedUser?.uid === u.uid
-                    ? "bg-gray-200"
-                    : "hover:bg-gray-100"
-                }`}
-              >
-                <div className="relative">
+
+        {/* Other Users */}
+        <div className="mt-4">
+          {users.map(
+            (u) =>
+              u.uid !== user?.uid && (
+                <div
+                  key={u.uid}
+                  onClick={() => setSelectedUser(u)}
+                  className={`flex items-center gap-2 p-3 cursor-pointer mx-2 rounded-lg ${
+                    selectedUser?.uid === u.uid
+                      ? "bg-indigo-100"
+                      : "hover:bg-gray-100"
+                  }`}
+                >
                   <img
                     src={u.photoURL}
                     alt=""
                     className="w-10 h-10 rounded-full"
                   />
-                  {onlineUsers[u.uid] && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-white border"></span>
-                  )}
+                  <div className="flex flex-col">
+                    <p className="font-medium">{u.displayName}</p>
+                    <p className="text-sm text-gray-500">{u.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">{u.displayName}</p>
-                  <p className="text-sm text-gray-500">{u.email}</p>
-                </div>
-              </div>
-            )
-        )}
+              )
+          )}
+        </div>
       </div>
 
-      {/* Chat */}
+      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        <div className="flex-1 p-4 overflow-y-auto">
+        <div className="flex-1 p-4 overflow-y-auto scrollbar-hide">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -189,6 +185,7 @@ export default function Chat() {
           ))}
         </div>
 
+        {/* Send Message */}
         <div className="p-4 border-t flex items-center">
           <input
             value={message}
@@ -199,7 +196,7 @@ export default function Chat() {
           />
           <button
             onClick={handleSend}
-            className="ml-2 bg-indigo-600 text-white px-4 py-2 rounded-md"
+            className="ml-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
           >
             Yuborish
           </button>

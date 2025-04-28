@@ -7,7 +7,6 @@ export default function App() {
   return (
     <div>
       <Routes>
-        <Route path="/chat" element={<Chat />} />
         <Route path="/home" element={<Home />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/chatregister" element={<ChatRegister />} />
