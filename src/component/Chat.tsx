@@ -40,6 +40,7 @@ export default function Chat() {
         setUser(currentUser);
         saveUser(currentUser);
 
+
         const userStatusRef = ref(database, `presence/${u.uid}`);
         set(userStatusRef, true);
         window.addEventListener("beforeunload", () =>
@@ -191,6 +192,7 @@ export default function Chat() {
             u.uid !== user?.uid && (
               <div
                 key={u.uid}
+
                 onClick={() => {
                   setSelectedUser(u);
                   // Notification nuqtachasini o'chirish
@@ -201,6 +203,8 @@ export default function Chat() {
                   });
                 }}
                 className={`flex items-center gap-2 p-3 cursor-pointer relative ${
+                onClick={() => setSelectedUser(u)}
+                className={`flex items-center gap-2 p-3 curso r-pointer ${
                   selectedUser?.uid === u.uid
                     ? "bg-gray-200"
                     : "hover:bg-gray-100"
@@ -250,7 +254,7 @@ export default function Chat() {
                     : "bg-green-500 rounded-bl-none"
                 }`}
               >
-                <p className="text-sm font-semibold">{msg.message}</p>
+                <p className="text-sm font-semibold mb-0">{msg.message}</p>
                 <span className="absolute text-xs right-2 bottom-[-16px] text-gray-900">
                   {new Date(msg.date).toLocaleTimeString([], {
                     hour: "2-digit",
