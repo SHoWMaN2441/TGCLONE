@@ -1,10 +1,8 @@
-// Chat.tsx
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, database } from "../firebase.config";
-import { onValue, push, ref, set } from "firebase/database";
 import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { onValue, push, ref, set, update, remove } from "firebase/database";
+import { auth, database } from "../firebase.config";
 import { useNavigate } from "react-router-dom";
-import { MdDelete } from "react-icons/md";
 
 type User = {
   uid: string;
@@ -25,12 +23,15 @@ export default function Chat() {
   const [user, setUser] = useState<User>();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<{ [key: string]: boolean }>(
     {}
   );
+  const [newMessages, setNewMessages] = useState<{ [key: string]: boolean }>(
+    {}
+  );
   const navigate = useNavigate();
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -38,6 +39,8 @@ export default function Chat() {
         const currentUser = u as User;
         setUser(currentUser);
         saveUser(currentUser);
+
+
         const userStatusRef = ref(database, `presence/${u.uid}`);
         set(userStatusRef, true);
         window.addEventListener("beforeunload", () =>
@@ -50,11 +53,11 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    const userRef = ref(database, "users");
-    onValue(userRef, (snapshot) => {
+    const usersRef = ref(database, "users");
+    onValue(usersRef, (snapshot) => {
       const fetched: User[] = [];
-      snapshot.forEach((item) => {
-        fetched.push({ uid: item.key!, ...item.val() });
+      snapshot.forEach((child) => {
+        fetched.push({ uid: child.key!, ...child.val() });
       });
       setUsers(fetched);
     });
@@ -65,20 +68,73 @@ export default function Chat() {
     });
   }, []);
 
+  // Yangi xabarlarni olish va notificationlarni yangilash
+  useEffect(() => {
+    if (user) {
+      const lastMessagesRef = ref(database, `lastMessages/${user.uid}`);
+      onValue(lastMessagesRef, (snapshot) => {
+        const notifications: { [key: string]: boolean } = {};
+        snapshot.forEach((child) => {
+          const data = child.val();
+          if (data.userId !== user.uid && !data.isRead) {
+            notifications[child.key!] = true;
+          }
+        });
+        setNewMessages(notifications);
+      });
+    }
+  }, [user]);
+
+  // Foydalanuvchi va tanlangan foydalanuvchi chatini olish
   useEffect(() => {
     if (user && selectedUser) {
       const chatId = createChatId(user.uid, selectedUser.uid);
-      const msgRef = ref(database, `messages/${chatId}`);
-      onValue(msgRef, (snapshot) => {
-        const msgs: Message[] = [];
-        snapshot.forEach((snap) => {
-          const data = snap.val();
-          msgs.push({ ...data });
+      const messagesRef = ref(database, `messages/${chatId}`);
+      onValue(messagesRef, (snapshot) => {
+        const fetched: Message[] = [];
+        snapshot.forEach((child) => {
+          fetched.push(child.val());
         });
-        setMessages(msgs);
+        setMessages(fetched);
       });
+
+      // Tanlangan foydalanuvchi chatiga o'tganida eski xabarlarni o'qilgan deb belgilash
+      const updateReadStatus = async () => {
+        const chatRef = ref(database, `messages/${chatId}`);
+        const snapshot = await snapshot.ref.once("value");
+        snapshot.forEach((child) => {
+          if (!child.val().isRead && child.val().userId !== user?.uid) {
+            const messageRef = ref(database, `messages/${chatId}/${child.key}`);
+            update(messageRef, { isRead: true });
+          }
+        });
+      };
+      updateReadStatus();
     }
   }, [user, selectedUser]);
+
+  // Tanlangan foydalanuvchiga o'tish va notificationni o'chirish
+  useEffect(() => {
+    if (selectedUser) {
+      // Tanlangan foydalanuvchi bo'lsa, oldingi xabarni lastMessages'dan o'chirish
+      const removeLastMessage = async () => {
+        const lastMsgRefForMe = ref(
+          database,
+          `lastMessages/${user?.uid}/${selectedUser.uid}`
+        );
+        const lastMsgRefForOther = ref(
+          database,
+          `lastMessages/${selectedUser.uid}/${user?.uid}`
+        );
+
+        // Xabarni o'chirish
+        await remove(lastMsgRefForMe);
+        await remove(lastMsgRefForOther);
+      };
+
+      removeLastMessage();
+    }
+  }, [selectedUser, user]);
 
   const saveUser = (user: User) => {
     const userRef = ref(database, `users/${user.uid}`);
@@ -89,29 +145,33 @@ export default function Chat() {
     });
   };
 
+  // Xabar yuborish
   const handleSend = () => {
     if (!message.trim() || !user || !selectedUser) return;
+
     const chatId = createChatId(user.uid, selectedUser.uid);
-    const newRef = push(ref(database, `messages/${chatId}`));
-    const newMessage = {
-      id: newRef.key!,
+    const newMessageRef = push(ref(database, `messages/${chatId}`));
+    const newMessage: Message = {
+      id: newMessageRef.key!,
       userId: user.uid,
       message,
       date: new Date().toISOString(),
       isRead: false,
     };
-    set(newRef, newMessage);
 
-    const lastMsg1 = ref(
+    set(newMessageRef, newMessage);
+
+    // Last messageni yangilash
+    const lastMsgForMe = ref(
       database,
       `lastMessages/${user.uid}/${selectedUser.uid}`
     );
-    const lastMsg2 = ref(
+    const lastMsgForOther = ref(
       database,
       `lastMessages/${selectedUser.uid}/${user.uid}`
     );
-    set(lastMsg1, newMessage);
-    set(lastMsg2, newMessage);
+    set(lastMsgForMe, newMessage);
+    set(lastMsgForOther, newMessage);
 
     setMessage("");
   };
@@ -123,15 +183,26 @@ export default function Chat() {
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
-      <div className="w-1/4 bg-white border-r border-gray-200 overflow-y-auto">
+      <div className="w-1/4 bg-white border-r overflow-y-auto">
         <header className="bg-indigo-600 text-white p-4 font-bold text-lg">
-          Chat Web
+          Chat App
         </header>
         {users.map(
           (u) =>
             u.uid !== user?.uid && (
               <div
                 key={u.uid}
+
+                onClick={() => {
+                  setSelectedUser(u);
+                  // Notification nuqtachasini o'chirish
+                  setNewMessages((prev) => {
+                    const updated = { ...prev };
+                    delete updated[u.uid]; // Bu foydalanuvchi uchun notificationni o'chirish
+                    return updated;
+                  });
+                }}
+                className={`flex items-center gap-2 p-3 cursor-pointer relative ${
                 onClick={() => setSelectedUser(u)}
                 className={`flex items-center gap-2 p-3 curso r-pointer ${
                   selectedUser?.uid === u.uid
@@ -139,26 +210,34 @@ export default function Chat() {
                     : "hover:bg-gray-100"
                 }`}
               >
-                <div className="relative">
+                <div className="relative w-12 h-12 flex-shrink-0">
                   <img
                     src={u.photoURL}
-                    alt=""
-                    className="w-10 h-10 rounded-full"
+                    alt={u.displayName}
+                    className="w-12 h-12 rounded-full object-cover"
                   />
+
+                  {/* Online status */}
                   {onlineUsers[u.uid] && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-white border"></span>
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
                   )}
+
+                  {/* Notification dot — faqat yangi xabar kelsa ko'rsatiladi */}
                 </div>
-                <div>
+
+                <div className="flex flex-col">
                   <p className="font-medium">{u.displayName}</p>
-                  <p className="text-sm text-gray-500">{u.email}</p>
+                  <p className="text-xs text-gray-500">{u.email}</p>
+                  {newMessages[u.uid] && (
+                    <span className="absolute top-10 right-4 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white"></span>
+                  )}
                 </div>
               </div>
             )
         )}
       </div>
 
-      {/* Chat */}
+      {/* Chat Window */}
       <div className="flex-1 flex flex-col">
         <div className="flex-1 p-4 overflow-y-auto">
           {messages.map((msg) => (
@@ -187,21 +266,24 @@ export default function Chat() {
           ))}
         </div>
 
-        <div className="p-4 border-t flex items-center">
-          <input
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="flex-1 border rounded-md px-3 py-2"
-            type="text"
-            placeholder="Xabar yozing..."
-          />
-          <button
-            onClick={handleSend}
-            className="ml-2 bg-indigo-600 text-white px-4 py-2 rounded-md"
-          >
-            Yuborish
-          </button>
-        </div>
+        {/* Send Message */}
+        {selectedUser && (
+          <div className="p-4 border-t flex items-center">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="flex-1 border rounded-md px-3 py-2"
+              placeholder="Xabar yozing..."
+            />
+            <button
+              onClick={handleSend}
+              className="ml-2 bg-indigo-600 text-white px-4 py-2 rounded-md"
+            >
+              Yuborish
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
