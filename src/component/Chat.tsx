@@ -133,7 +133,7 @@ export default function Chat() {
               <div
                 key={u.uid}
                 onClick={() => setSelectedUser(u)}
-                className={`flex items-center gap-2 p-3 cursor-pointer ${
+                className={`flex items-center gap-2 p-3 curso r-pointer ${
                   selectedUser?.uid === u.uid
                     ? "bg-gray-200"
                     : "hover:bg-gray-100"

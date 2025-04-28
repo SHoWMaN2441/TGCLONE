@@ -1,136 +1,30 @@
-import { ref, set, onValue, push, remove } from "firebase/database";
-import { useEffect, useState } from "react";
-import { database } from "./firebase.config";
+import { Link } from "react-router-dom";
 
-type User = {
-  id: string;
-  name: string;
-  age: number;
-  email: string;
-};
-export default function Home() {
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [age, setAge] = useState("");
-  const [soqchi, setSoqchi] = useState("");
-  const [users, setUsers] = useState<User[]>([]);
-  const handleSave = () => {
-    const userEndPoint = ref(database, "users");
-    if (soqchi === "") {
-      const reference = push(userEndPoint);
-      set(reference, {
-        name,
-        email,
-        age,
-      });
-    } else {
-      const userEndPoint = ref(database, `users/${soqchi}`);
-      set(userEndPoint, {
-        name,
-        email,
-        age,
-      });
-      setSoqchi("");
-    }
-  };
-
-  const fetchUsers = () => {
-    const UserRef = ref(database, "users");
-    onValue(UserRef, (snapshot) => {
-      const users: User[] = [];
-      snapshot.forEach((item) => {
-        users.push({ id: item.key, ...item.val() });
-      });
-      setUsers(users);
-    });
-  };
-  const handleDelete = (userId: string) => {
-    const deleteRef = ref(database, `users/${userId}`);
-    remove(deleteRef);
-  };
-  const handleUpdate = (user: User) => {
-    setSoqchi(user.id);
-    setAge(user.age + "");
-    setEmail(user.email);
-    setName(user.name);
-  };
-
+const Home = () => {
   return (
-    <div>
-      <div className="card max-w-[400px] mx-auto mt-5">
-        <div className="card-header bg-dark text-white text-center  ">
-          Register
-        </div>
-        <div className="card-body space-y-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            type="email"
-            placeholder="Name..."
-            className="form-control"
-          />
-          <input
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            type="email"
-            placeholder="Age..."
-            className="form-control"
-          />
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            placeholder="Email..."
-            className="form-control"
-          />
-        </div>
-        <div className="card-footer">
-          {" "}
-          <button onClick={handleSave} className="btn btn-dark w-full">
-            Save
-          </button>
-          <div className="mt-2 mx-auto  flex items-center justify-center"></div>
-        </div>
-      </div>
-      <div className="mt-4">
-        <table className="table">
-          <thead className="table-dark">
-            <tr>
-              <th>Id</th>
-              <th>Name</th>
-              <th>Age</th>
-              <th>Email</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr>
-                <td>{user.id}</td>
-                <td>{user.name}</td>
-                <td>{user.age}</td>
-                <td>{user.email}</td>
-                <td>
-                  <button
-                    onClick={() => handleDelete(user.id)}
-                    className="btn btn-close"
-                  ></button>
-                  <button
-                    onClick={() => handleUpdate(user)}
-                    className="btn btn-warning ml-2"
-                  >
-                    edit
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="w-[full] mx-auto flex h-screen items-center justify-center bg-teal-300">
+      <div className="flex gap-5 justify-center items-center">
+        <Link to="/Chat" target="_blank">
+          <div
+            style={{ textDecoration: "none" }}
+            className="bg-[url('./image.png')] text-white bg-cover bg-center w-[400px] h-[300px] hover:scale-110 transition shadow-lg rounded-lg flex flex-col items-center justify-end p-4 m-4 hover:shadow-xl duration-300 ease-in-out"
+          >
+            <h2>CHAT APP</h2>
+          </div>
+        </Link>
+
+        <a
+          href="https://mini-gamesashdr.netlify.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <div className="bg-[url('./forback.png')] object-contain text-white bg-cover bg-center w-[400px] h-[300px] hover:scale-110 transition shadow-lg rounded-lg flex flex-col items-center justify-end p-4 m-4 hover:shadow-xl duration-300 ease-in-out">
+            <h2>GAMEHUB</h2>
+          </div>
+        </a>
       </div>
     </div>
   );
-}
+};
+
+export default Home;
