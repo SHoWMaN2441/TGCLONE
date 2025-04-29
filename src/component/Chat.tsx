@@ -33,8 +33,8 @@ export default function Chat() {
   );
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
-  const [editedMessage, setEditedMessage] = useState(""); // Tahrir qilinayotgan xabar
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null); // Tahrir qilinayotgan xabarning IDsi
+  const [editedMessage, setEditedMessage] = useState(""); 
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null); 
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -215,10 +215,9 @@ export default function Chat() {
                 key={u.uid}
                 onClick={() => {
                   setSelectedUser(u);
-                  // Notification nuqtachasini o'chirish
                   setNewMessages((prev) => {
                     const updated = { ...prev };
-                    delete updated[u.uid]; // Bu foydalanuvchi uchun notificationni o'chirish
+                    delete updated[u.uid]; 
                     return updated;
                   });
                 }}
@@ -235,7 +234,6 @@ export default function Chat() {
                     className="w-12 h-12 rounded-full object-cover"
                   />
 
-                  {/* Online status */}
                   {onlineUsers[u.uid] && (
                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
                   )}
@@ -253,7 +251,6 @@ export default function Chat() {
         )}
       </div>
 
-      {/* Chat Window */}
       <div className="flex-1 flex flex-col">
         <div className="flex-1 p-4 overflow-y-auto">
           {messages.map((msg) => (
@@ -276,11 +273,11 @@ export default function Chat() {
                       type="text"
                       value={editedMessage}
                       onChange={(e) => setEditedMessage(e.target.value)}
-                      onKeyDown={handleKeyPress} // "Enter" bosilganda tahrirni saqlash
+                      onKeyDown={handleKeyPress} 
                       className="w-full bg-white text-black rounded-md p-2"
                     />
                     <button
-                      onClick={handleEditMessage} // Tahrirni saqlash uchun tugma
+                      onClick={handleEditMessage} 
                       className="mt-2 bg-indigo-500 text-white p-2 rounded-md"
                     >
                       Saqlash
@@ -308,7 +305,7 @@ export default function Chat() {
                       <MdEdit size={20} />
                     </button>
                     <button
-                      onClick={() => handleDeleteMessage(msg.id)} // O'chirish
+                      onClick={() => handleDeleteMessage(msg.id)} 
                       className="absolute  bottom-1 right-8 text-red-500"
                     >
                       <MdDelete size={20} />
@@ -320,7 +317,6 @@ export default function Chat() {
           ))}
         </div>
 
-        {/* Send Message */}
         {selectedUser && (
           <div className="p-4 border-t flex items-center">
             <input
