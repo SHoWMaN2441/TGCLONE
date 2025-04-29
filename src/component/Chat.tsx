@@ -70,7 +70,6 @@ export default function Chat() {
     });
   }, []);
 
-  // Yangi xabarlarni olish va notificationlarni yangilash
   useEffect(() => {
     if (user) {
       const lastMessagesRef = ref(database, `lastMessages/${user.uid}`);
@@ -87,7 +86,6 @@ export default function Chat() {
     }
   }, [user]);
 
-  // Foydalanuvchi va tanlangan foydalanuvchi chatini olish
   useEffect(() => {
     if (user && selectedUser) {
       const chatId = createChatId(user.uid, selectedUser.uid);
@@ -100,7 +98,6 @@ export default function Chat() {
         setMessages(fetched);
       });
 
-      // Tanlangan foydalanuvchi chatiga o'tganida eski xabarlarni o'qilgan deb belgilash
       const updateReadStatus = async () => {
         const chatRef = ref(database, `messages/${chatId}`);
         const snapshot = await snapshot.ref.once("value");
@@ -115,10 +112,8 @@ export default function Chat() {
     }
   }, [user, selectedUser]);
 
-  // Tanlangan foydalanuvchiga o'tish va notificationni o'chirish
   useEffect(() => {
     if (selectedUser) {
-      // Tanlangan foydalanuvchi bo'lsa, oldingi xabarni lastMessages'dan o'chirish
       const removeLastMessage = async () => {
         const lastMsgRefForMe = ref(
           database,
@@ -129,7 +124,6 @@ export default function Chat() {
           `lastMessages/${selectedUser.uid}/${user?.uid}`
         );
 
-        // Xabarni o'chirish
         await remove(lastMsgRefForMe);
         await remove(lastMsgRefForOther);
       };
@@ -147,7 +141,6 @@ export default function Chat() {
     });
   };
 
-  // Xabar yuborish
   const handleSend = () => {
     if (!message.trim() || !user || !selectedUser) return;
 
@@ -163,7 +156,6 @@ export default function Chat() {
 
     set(newMessageRef, newMessage);
 
-    // Last messageni yangilash
     const lastMsgForMe = ref(
       database,
       `lastMessages/${user.uid}/${selectedUser.uid}`
@@ -178,7 +170,6 @@ export default function Chat() {
     setMessage("");
   };
 
-  // Xabarni tahrirlash
   const handleEditMessage = async () => {
     if (editedMessage.trim() && editingMessageId && user && selectedUser) {
       const chatId = createChatId(user.uid, selectedUser.uid);
@@ -213,10 +204,9 @@ export default function Chat() {
 
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
       <div className="w-1/4 bg-white border-r overflow-y-auto">
-        <header className="bg-indigo-600 text-white p-4 font-bold text-lg">
-          Chat App
+        <header className="bg-indigo-600 h-10 items-center flex text-white p-4 font-bold text-lg">
+          Chats
         </header>
         {users.map(
           (u) =>
