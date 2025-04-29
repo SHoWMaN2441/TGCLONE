@@ -21,7 +21,6 @@ const Header = () => {
           <li className="scale-110 text-lg font-bold cursor-pointer"></li>
         </ul>
       </div>
-      <div>MyProfile</div>
     </div>
   );
 };

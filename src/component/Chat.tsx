@@ -302,7 +302,7 @@ export default function Chat() {
                     })}
                   </span>
                   {msg.userId === user?.uid && (
-                    <div className="absolute top-1 right-1 flex gap-1">
+                    <div className="absolute top-12 right-12 flex gap-1">
                       <MdEdit
                         size={16}
                         className="cursor-pointer text-yellow-300"
