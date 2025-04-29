@@ -11,6 +11,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/chat" element={<Chat />} />
+
         <Route path="/home" element={<Home />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/chatregister" element={<ChatRegister />} />
