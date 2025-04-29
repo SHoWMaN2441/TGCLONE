@@ -12,12 +12,15 @@ const Header = () => {
       </Link>
       <div>
         <ul className="flex items-center gap-5">
-          <li className="scale-110 text-lg font-bold cursor-pointer">
-            Bizning Jamoa
-          </li>
-          <li className="scale-110 text-lg font-bold cursor-pointer">
-            Our Games
-          </li>
+          <Link
+            style={{ textDecoration: "none", color: "inherit" }}
+            to="https://mini-gamesashdr.netlify.app/"
+            target="_blank"
+          >
+            <li className="scale-110 text-lg font-bold cursor-pointer">
+              Our Games
+            </li>
+          </Link>
           <li className="scale-110 text-lg font-bold cursor-pointer"></li>
         </ul>
       </div>

@@ -238,7 +238,7 @@ export default function Chat() {
 
       {/* Main Chat */}
       <div className="flex-1 flex flex-col">
-        {/* Top bar showing selected user */}
+        {/* Tanlanga User chati */}
         {selectedUser && (
           <div className="bg-indigo-600 text-white px-4 py-3 flex items-center justify-center">
             <img
@@ -276,6 +276,7 @@ export default function Chat() {
                       : "bg-green-500 rounded-bl-none"
                   }`}
                 >
+                  {/* Edit elementi */}
                   {editingMessageId === msg.id ? (
                     <>
                       <input
@@ -311,6 +312,7 @@ export default function Chat() {
                           setEditedMessage(msg.message);
                         }}
                       />
+                      {/* Delete */}
                       <MdDelete
                         size={16}
                         className="cursor-pointer text-red-400"
