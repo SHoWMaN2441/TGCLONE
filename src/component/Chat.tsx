@@ -3,6 +3,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { onValue, push, ref, set, update, remove } from "firebase/database";
 import { auth, database } from "../firebase.config";
 import { useNavigate } from "react-router-dom";
+import { MdDelete, MdEdit } from "react-icons/md";
 
 type User = {
   uid: string;
@@ -32,6 +33,8 @@ export default function Chat() {
   );
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
+  const [editedMessage, setEditedMessage] = useState(""); // Tahrir qilinayotgan xabar
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null); // Tahrir qilinayotgan xabarning IDsi
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -39,7 +42,6 @@ export default function Chat() {
         const currentUser = u as User;
         setUser(currentUser);
         saveUser(currentUser);
-
 
         const userStatusRef = ref(database, `presence/${u.uid}`);
         set(userStatusRef, true);
@@ -176,6 +178,35 @@ export default function Chat() {
     setMessage("");
   };
 
+  // Xabarni tahrirlash
+  const handleEditMessage = async () => {
+    if (editedMessage.trim() && editingMessageId && user && selectedUser) {
+      const chatId = createChatId(user.uid, selectedUser.uid);
+      const messageRef = ref(
+        database,
+        `messages/${chatId}/${editingMessageId}`
+      );
+      await update(messageRef, { message: editedMessage });
+
+      setEditingMessageId(null);
+      setEditedMessage("");
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleEditMessage();
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (user && selectedUser) {
+      const chatId = createChatId(user.uid, selectedUser.uid);
+      const messageRef = ref(database, `messages/${chatId}/${messageId}`);
+      await remove(messageRef);
+    }
+  };
+
   const createChatId = (uid1: string, uid2: string) => {
     return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
   };
@@ -192,7 +223,6 @@ export default function Chat() {
             u.uid !== user?.uid && (
               <div
                 key={u.uid}
-
                 onClick={() => {
                   setSelectedUser(u);
                   // Notification nuqtachasini o'chirish
@@ -203,8 +233,6 @@ export default function Chat() {
                   });
                 }}
                 className={`flex items-center gap-2 p-3 cursor-pointer relative ${
-                onClick={() => setSelectedUser(u)}
-                className={`flex items-center gap-2 p-3 curso r-pointer ${
                   selectedUser?.uid === u.uid
                     ? "bg-gray-200"
                     : "hover:bg-gray-100"
@@ -221,8 +249,6 @@ export default function Chat() {
                   {onlineUsers[u.uid] && (
                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
                   )}
-
-                  {/* Notification dot — faqat yangi xabar kelsa ko'rsatiladi */}
                 </div>
 
                 <div className="flex flex-col">
@@ -254,13 +280,51 @@ export default function Chat() {
                     : "bg-green-500 rounded-bl-none"
                 }`}
               >
-                <p className="text-sm font-semibold mb-0">{msg.message}</p>
+                {editingMessageId === msg.id ? (
+                  <div>
+                    <input
+                      type="text"
+                      value={editedMessage}
+                      onChange={(e) => setEditedMessage(e.target.value)}
+                      onKeyDown={handleKeyPress} // "Enter" bosilganda tahrirni saqlash
+                      className="w-full bg-white text-black rounded-md p-2"
+                    />
+                    <button
+                      onClick={handleEditMessage} // Tahrirni saqlash uchun tugma
+                      className="mt-2 bg-indigo-500 text-white p-2 rounded-md"
+                    >
+                      Saqlash
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold">{msg.message}</p>
+                )}
+
                 <span className="absolute text-xs right-2 bottom-[-16px] text-gray-900">
                   {new Date(msg.date).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
                 </span>
+                {msg.userId === user?.uid && (
+                  <div>
+                    <button
+                      onClick={() => {
+                        setEditingMessageId(msg.id);
+                        setEditedMessage(msg.message);
+                      }}
+                      className="absolute bottom-1 right-2 text-yellow-500"
+                    >
+                      <MdEdit size={20} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteMessage(msg.id)} // O'chirish
+                      className="absolute  bottom-1 right-8 text-red-500"
+                    >
+                      <MdDelete size={20} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
