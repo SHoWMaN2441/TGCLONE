@@ -33,8 +33,8 @@ export default function Chat() {
   );
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
-  const [editedMessage, setEditedMessage] = useState(""); // Tahrir qilinayotgan xabar
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null); // Tahrir qilinayotgan xabarning IDsi
+  const [editedMessage, setEditedMessage] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -99,12 +99,14 @@ export default function Chat() {
       });
 
       const updateReadStatus = async () => {
-        const chatRef = ref(database, `messages/${chatId}`);
-        const snapshot = await snapshot.ref.once("value");
+        const snapshot = await ref(database, `messages/${chatId}`).once(
+          "value"
+        );
         snapshot.forEach((child) => {
-          if (!child.val().isRead && child.val().userId !== user?.uid) {
-            const messageRef = ref(database, `messages/${chatId}/${child.key}`);
-            update(messageRef, { isRead: true });
+          if (!child.val().isRead && child.val().userId !== user.uid) {
+            update(ref(database, `messages/${chatId}/${child.key}`), {
+              isRead: true,
+            });
           }
         });
       };
@@ -115,26 +117,19 @@ export default function Chat() {
   useEffect(() => {
     if (selectedUser) {
       const removeLastMessage = async () => {
-        const lastMsgRefForMe = ref(
-          database,
-          `lastMessages/${user?.uid}/${selectedUser.uid}`
+        await remove(
+          ref(database, `lastMessages/${user?.uid}/${selectedUser.uid}`)
         );
-        const lastMsgRefForOther = ref(
-          database,
-          `lastMessages/${selectedUser.uid}/${user?.uid}`
+        await remove(
+          ref(database, `lastMessages/${selectedUser.uid}/${user?.uid}`)
         );
-
-        await remove(lastMsgRefForMe);
-        await remove(lastMsgRefForOther);
       };
-
       removeLastMessage();
     }
   }, [selectedUser, user]);
 
   const saveUser = (user: User) => {
-    const userRef = ref(database, `users/${user.uid}`);
-    set(userRef, {
+    set(ref(database, `users/${user.uid}`), {
       email: user.email,
       displayName: user.displayName,
       photoURL: user.photoURL,
@@ -155,17 +150,14 @@ export default function Chat() {
     };
 
     set(newMessageRef, newMessage);
-
-    const lastMsgForMe = ref(
-      database,
-      `lastMessages/${user.uid}/${selectedUser.uid}`
+    set(
+      ref(database, `lastMessages/${user.uid}/${selectedUser.uid}`),
+      newMessage
     );
-    const lastMsgForOther = ref(
-      database,
-      `lastMessages/${selectedUser.uid}/${user.uid}`
+    set(
+      ref(database, `lastMessages/${selectedUser.uid}/${user.uid}`),
+      newMessage
     );
-    set(lastMsgForMe, newMessage);
-    set(lastMsgForOther, newMessage);
 
     setMessage("");
   };
@@ -173,88 +165,94 @@ export default function Chat() {
   const handleEditMessage = async () => {
     if (editedMessage.trim() && editingMessageId && user && selectedUser) {
       const chatId = createChatId(user.uid, selectedUser.uid);
-      const messageRef = ref(
-        database,
-        `messages/${chatId}/${editingMessageId}`
-      );
-      await update(messageRef, { message: editedMessage });
-
+      await update(ref(database, `messages/${chatId}/${editingMessageId}`), {
+        message: editedMessage,
+      });
       setEditingMessageId(null);
       setEditedMessage("");
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleEditMessage();
     }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
     if (user && selectedUser) {
       const chatId = createChatId(user.uid, selectedUser.uid);
-      const messageRef = ref(database, `messages/${chatId}/${messageId}`);
-      await remove(messageRef);
+      await remove(ref(database, `messages/${chatId}/${messageId}`));
     }
   };
 
-  const createChatId = (uid1: string, uid2: string) => {
-    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleEditMessage();
   };
+
+  const createChatId = (a: string, b: string) =>
+    a < b ? `${a}_${b}` : `${b}_${a}`;
 
   return (
     <div className="flex h-screen">
+      {/* Sidebar */}
       <div className="w-1/4 bg-white border-r overflow-y-auto">
-        <header className="bg-indigo-600 h-10 items-center flex text-white p-4 font-bold text-lg">
-          Chats
+        <header className="bg-indigo-600 h-20 flex items-center justify-center text-white px-4">
+          <div className="flex items-center gap-3">
+            <img
+              src={user?.photoURL}
+              alt={user?.displayName}
+              className="w-12 h-12 rounded-full object-cover"
+            />
+            <span className="text-lg font-medium">{user?.displayName}</span>
+          </div>
         </header>
-        {users.map(
-          (u) =>
-            u.uid !== user?.uid && (
-              <div
-                key={u.uid}
-                onClick={() => {
-                  setSelectedUser(u);
-                  // Notification nuqtachasini o'chirish
-                  setNewMessages((prev) => {
-                    const updated = { ...prev };
-                    delete updated[u.uid]; // Bu foydalanuvchi uchun notificationni o'chirish
-                    return updated;
-                  });
-                }}
-                className={`flex items-center gap-2 p-3 cursor-pointer relative ${
-                  selectedUser?.uid === u.uid
-                    ? "bg-gray-200"
-                    : "hover:bg-gray-100"
-                }`}
-              >
-                <div className="relative w-12 h-12 flex-shrink-0">
-                  <img
-                    src={u.photoURL}
-                    alt={u.displayName}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-
-                  {/* Online status */}
-                  {onlineUsers[u.uid] && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                  )}
-                </div>
-
-                <div className="flex flex-col">
-                  <p className="font-medium">{u.displayName}</p>
-                  <p className="text-xs text-gray-500">{u.email}</p>
-                  {newMessages[u.uid] && (
-                    <span className="absolute top-10 right-4 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white"></span>
-                  )}
-                </div>
+        {users.map((u) =>
+          u.uid !== user?.uid ? (
+            <div
+              key={u.uid}
+              onClick={() => {
+                setSelectedUser(u);
+                setNewMessages((prev) => {
+                  const copy = { ...prev };
+                  delete copy[u.uid];
+                  return copy;
+                });
+              }}
+              className={`flex items-center gap-3 p-3 cursor-pointer ${
+                selectedUser?.uid === u.uid
+                  ? "bg-gray-200"
+                  : "hover:bg-gray-100"
+              }`}
+            >
+              <img
+                src={u.photoURL}
+                alt={u.displayName}
+                className="w-12 h-12 rounded-full object-cover"
+              />
+              <div className="flex flex-col">
+                <span className="font-medium">{u.displayName}</span>
+                <span className="text-xs text-gray-500">{u.email}</span>
               </div>
-            )
+              {newMessages[u.uid] && (
+                <span className="ml-auto w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white"></span>
+              )}
+            </div>
+          ) : null
         )}
       </div>
 
-      {/* Chat Window */}
+      {/* Main Chat */}
       <div className="flex-1 flex flex-col">
+        {/* Top bar showing selected user */}
+        {selectedUser && (
+          <div className="bg-indigo-600 text-white px-4 py-3 flex items-center justify-center">
+            <img
+              src={selectedUser.photoURL}
+              alt={selectedUser.displayName}
+              className="w-10 h-10 rounded-full object-cover mr-3"
+            />
+            <span className="font-semibold text-lg">
+              {selectedUser.displayName}
+            </span>
+          </div>
+        )}
+
+        {/* Messages */}
         <div className="flex-1 p-4 overflow-y-auto">
           {messages.map((msg) => (
             <div
@@ -263,79 +261,94 @@ export default function Chat() {
                 msg.userId === user?.uid ? "justify-end" : "justify-start"
               }`}
             >
-              <div
-                className={`max-w-md p-3 rounded-xl text-white relative ${
-                  msg.userId === user?.uid
-                    ? "bg-indigo-500 rounded-br-none"
-                    : "bg-green-500 rounded-bl-none"
-                }`}
-              >
-                {editingMessageId === msg.id ? (
-                  <div>
-                    <input
-                      type="text"
-                      value={editedMessage}
-                      onChange={(e) => setEditedMessage(e.target.value)}
-                      onKeyDown={handleKeyPress} // "Enter" bosilganda tahrirni saqlash
-                      className="w-full bg-white text-black rounded-md p-2"
-                    />
-                    <button
-                      onClick={handleEditMessage} // Tahrirni saqlash uchun tugma
-                      className="mt-2 bg-indigo-500 text-white p-2 rounded-md"
-                    >
-                      Saqlash
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-sm font-semibold">{msg.message}</p>
+              <div className="relative flex items-center gap-2">
+                {msg.userId !== user?.uid && (
+                  <img
+                    src={selectedUser?.photoURL}
+                    alt="Avatar"
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
                 )}
-
-                <span className="absolute text-xs right-2 bottom-[-16px] text-gray-900">
-                  {new Date(msg.date).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
+                <div
+                  className={`max-w-md p-3 rounded-xl text-white ${
+                    msg.userId === user?.uid
+                      ? "bg-indigo-500 rounded-br-none"
+                      : "bg-green-500 rounded-bl-none"
+                  }`}
+                >
+                  {editingMessageId === msg.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editedMessage}
+                        onChange={(e) => setEditedMessage(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        className="w-full bg-white text-black rounded-md p-2"
+                      />
+                      <button
+                        onClick={handleEditMessage}
+                        className="mt-2 bg-indigo-500 text-white px-2 py-1 rounded"
+                      >
+                        Saqlash
+                      </button>
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold">{msg.message}</p>
+                  )}
+                  <span className="absolute text-xs right-2 bottom-[-16px] text-gray-900">
+                    {new Date(msg.date).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  {msg.userId === user?.uid && (
+                    <div className="absolute top-1 right-1 flex gap-1">
+                      <MdEdit
+                        size={16}
+                        className="cursor-pointer text-yellow-300"
+                        onClick={() => {
+                          setEditingMessageId(msg.id);
+                          setEditedMessage(msg.message);
+                        }}
+                      />
+                      <MdDelete
+                        size={16}
+                        className="cursor-pointer text-red-400"
+                        onClick={() => handleDeleteMessage(msg.id)}
+                      />
+                    </div>
+                  )}
+                </div>
                 {msg.userId === user?.uid && (
-                  <div>
-                    <button
-                      onClick={() => {
-                        setEditingMessageId(msg.id);
-                        setEditedMessage(msg.message);
-                      }}
-                      className="absolute bottom-1 right-2 text-yellow-500"
-                    >
-                      <MdEdit size={20} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteMessage(msg.id)} // O'chirish
-                      className="absolute  bottom-1 right-8 text-red-500"
-                    >
-                      <MdDelete size={20} />
-                    </button>
-                  </div>
+                  <img
+                    src={user.photoURL}
+                    alt="Avatar"
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
                 )}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Send Message */}
+        {/* Input */}
         {selectedUser && (
-          <div className="p-4 border-t flex items-center">
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="flex-1 border rounded-md px-3 py-2"
-              placeholder="Xabar yozing..."
-            />
-            <button
-              onClick={handleSend}
-              className="ml-2 bg-indigo-600 text-white px-4 py-2 rounded-md"
-            >
-              Yuborish
-            </button>
+          <div className="border-t p-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Xabar yozing..."
+                className="flex-1 border rounded-md px-3 py-2"
+              />
+              <button
+                onClick={handleSend}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md"
+              >
+                Yuborish
+              </button>
+            </div>
           </div>
         )}
       </div>
